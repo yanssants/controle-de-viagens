@@ -86,11 +86,7 @@ class _PDF(FPDF):
         self.ln(1.5)
 
     def footer(self) -> None:
-        self.set_y(-12)
-        self.fonte_(8, cor=MUTED)
-        self.cell(0, 5, self.t(f"Gerado em {self.gerado_em}"), align="L")
-        self.set_x(self.l_margin)
-        self.cell(0, 5, self.t(f"Página {self.page_no()} de {{nb}}"), align="R")
+        """Sem rodapé (sem data de geração e sem numeração de páginas)."""
 
 
 def _cabecalho(pdf: _PDF, inicio: date, fim: date, nome_usuario: str, empresa: str) -> None:
@@ -98,8 +94,6 @@ def _cabecalho(pdf: _PDF, inicio: date, fim: date, nome_usuario: str, empresa: s
     pdf.cell(0, 10, pdf.t("Viagens a clientes"), new_x="LMARGIN", new_y="NEXT")
     pdf.fonte_(10, cor=TEXTO_2)
     pdf.cell(0, 6, pdf.t(f"Período: {data_br(inicio)} a {data_br(fim)}"), new_x="LMARGIN", new_y="NEXT")
-    pdf.fonte_(10, cor=MUTED)
-    pdf.cell(0, 6, pdf.t(f"{nome_usuario} · {empresa}"), new_x="LMARGIN", new_y="NEXT")
     y = pdf.get_y() + 3
     pdf.set_draw_color(*AZUL)
     pdf.set_line_width(0.8)
