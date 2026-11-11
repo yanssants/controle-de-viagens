@@ -1,0 +1,13 @@
+# Credenciais
+.streamlit/secrets.toml
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Supabase CLI (arquivos locais)
+supabase/.branches/
+supabase/.temp/

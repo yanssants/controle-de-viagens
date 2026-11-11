@@ -1,0 +1,4 @@
+streamlit>=1.50
+supabase>=2.10
+fpdf2>=2.8
+tzdata>=2024.1
