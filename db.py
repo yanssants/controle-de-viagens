@@ -103,7 +103,9 @@ def criar_viagem(saida: str, destino: str, tipo: str, motivo: str) -> None:
     _buscar_viagens.clear()
 
 
-def atualizar_viagem(viagem_id: int, saida: str, destino: str, tipo: str, motivo: str) -> None:
+def atualizar_viagem(
+    viagem_id: int, saida: str, destino: str, tipo: str, motivo: str, criado_em: datetime | None = None
+) -> None:
     dados = {
         "saida": saida,
         "destino": destino,
@@ -111,6 +113,8 @@ def atualizar_viagem(viagem_id: int, saida: str, destino: str, tipo: str, motivo
         "valor": float(VALORES_TIPO[tipo]),
         "motivo": motivo,
     }
+    if criado_em is not None:  # correção da data/hora da viagem
+        dados["criado_em"] = _utc_iso(criado_em)
     _executar(lambda c: c.table("viagens").update(dados).eq("id", viagem_id), "salvar a viagem")
     _buscar_viagens.clear()
 

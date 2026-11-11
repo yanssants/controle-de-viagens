@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 import streamlit as st
 
 import db
 import ui
-from config import MAX_LOCAL, MAX_MOTIVO, SAIDA_PADRAO, TIPOS
+from config import FUSO, MAX_LOCAL, MAX_MOTIVO, SAIDA_PADRAO, TIPOS
 from formatos import agora, brl, data_br, data_hora_br, hoje, primeiro_dia_do_mes
 from telas.comum import DATA_MAX, DATA_MIN, dialogo_relatorio, periodo_valido
 
@@ -128,8 +129,21 @@ def dialogo_viagem(viagem: dict, nonce: str, confirmar_exclusao: bool = False) -
     chave_confirmar = prefixo + "confirmar"
     st.session_state.setdefault(chave_confirmar, confirmar_exclusao)
 
-    ui.subtitulo_dialogo("Altere os dados da viagem. A data de registro não pode ser editada.")
-    ui.html_(ui.chip_data(f"Registrada em {data_hora_br(viagem['criado_em'], ' às ')}"))
+    ui.subtitulo_dialogo("Altere os dados da viagem.")
+
+    original = viagem["criado_em"]
+    c_data, c_hora = st.columns(2)
+    data_viagem = c_data.date_input(
+        "Data da viagem",
+        value=original.date(),
+        key=prefixo + "data",
+        format="DD/MM/YYYY",
+        min_value=DATA_MIN,
+        max_value=DATA_MAX,
+    )
+    hora_viagem = c_hora.time_input(
+        "Hora", value=original.time().replace(second=0, microsecond=0), key=prefixo + "hora", step=60
+    )
 
     c1, c2 = st.columns(2)
     saida = c1.text_input("Local de saída", value=viagem["saida"], key=prefixo + "saida", max_chars=MAX_LOCAL)
@@ -190,11 +204,16 @@ def dialogo_viagem(viagem: dict, nonce: str, confirmar_exclusao: bool = False) -
         if c_salvar.button("Salvar alterações", key=prefixo + "salvar", type="primary", width="stretch"):
             saida, destino, motivo = saida.strip(), destino.strip(), motivo.strip()
             erros = _validar(saida, destino, tipo, motivo)
+            if not data_viagem or hora_viagem is None:
+                erros.append("Informe a data e a hora da viagem.")
             if erros:
                 st.error("\n\n".join(erros))
                 return
+            # Só grava nova data/hora se o usuário mudou algo (preserva os segundos originais)
+            nova = datetime.combine(data_viagem, hora_viagem, FUSO)
+            mudou = nova != original.replace(second=0, microsecond=0)
             try:
-                db.atualizar_viagem(viagem["id"], saida, destino, tipo, motivo)
+                db.atualizar_viagem(viagem["id"], saida, destino, tipo, motivo, nova if mudou else None)
             except db.ErroBanco as erro:
                 st.error(str(erro))
                 return
