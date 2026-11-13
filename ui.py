@@ -181,9 +181,9 @@ def aviso(texto: str) -> None:
 
 
 def rotulo_cartao_tipo(tipo: str) -> str:
-    """Texto do cartão de seleção do tipo: nome, dica e valor (cada um em um parágrafo)."""
+    """Texto do cartão de seleção do tipo: nome e valor (cada um em um parágrafo)."""
     info = TIPOS[tipo]
-    return f"{info['rotulo']}\n\n{info['dica']}\n\n{brl(info['valor'])}"
+    return f"{info['rotulo']}\n\n{brl(info['valor'])}"
 
 
 def rotulo_tipo(tipo: str) -> str:
