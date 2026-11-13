@@ -188,12 +188,12 @@ def _tabela_viagens(pdf: _PDF, viagens: list[dict], total: Decimal) -> None:
         pdf.ln(4)
         return
     linhas = []
-    for n, v in enumerate(sorted(viagens, key=lambda x: x["criado_em"]), start=1):
+    for n, v in enumerate(sorted(viagens, key=lambda x: (x["criado_em"], x["id"])), start=1):
         info = TIPOS.get(v["tipo"], {"rotulo": v["tipo"], "cor": "#3A404C"})
         linhas.append(
             [
                 str(n),
-                data_hora_br(v["criado_em"]),
+                data_br(v["criado_em"]),
                 v["saida"],
                 v["destino"],
                 (info["rotulo"], FontFace(emphasis="BOLD", color=_rgb(info["cor"]))),
@@ -203,7 +203,7 @@ def _tabela_viagens(pdf: _PDF, viagens: list[dict], total: Decimal) -> None:
         )
     _tabela(
         pdf,
-        ["#", "Data/hora", "Saída", "Destino", "Tipo", "Motivo", "Valor"],
+        ["#", "Data", "Saída", "Destino", "Tipo", "Motivo", "Valor"],
         (8, 25, 27, 30, 21, 47, 22),
         ("LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "LEFT", "RIGHT"),
         linhas,

@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import streamlit as st
 
 import db
 import ui
-from config import FUSO, MAX_LOCAL, MAX_MOTIVO, SAIDA_PADRAO, TIPOS
-from formatos import agora, brl, data_br, data_hora_br, hoje, primeiro_dia_do_mes
+from config import MAX_LOCAL, MAX_MOTIVO, SAIDA_PADRAO, TIPOS
+from formatos import brl, data_br, hoje, primeiro_dia_do_mes
 from telas.comum import DATA_MAX, DATA_MIN, dialogo_relatorio, periodo_valido
 
 # Larguras: Data, Saída, Destino, Tipo, Motivo, Valor, Editar, Excluir
@@ -36,6 +35,7 @@ def _validar(saida: str, destino: str, tipo: str | None, motivo: str) -> list[st
 
 def _iniciar_estado() -> None:
     ss = st.session_state
+    ss.setdefault("nv_data", hoje())
     ss.setdefault("nv_saida", SAIDA_PADRAO)
     ss.setdefault("nv_destino", "")
     ss.setdefault("nv_motivo", "")
@@ -46,6 +46,7 @@ def _iniciar_estado() -> None:
 
 def _limpar_formulario() -> None:
     ss = st.session_state
+    ss.nv_data = hoje()
     ss.nv_saida = SAIDA_PADRAO
     ss.nv_destino = ""
     ss.nv_motivo = ""
@@ -59,12 +60,15 @@ def _registrar() -> None:
     destino = ss.nv_destino.strip()
     motivo = ss.nv_motivo.strip()
     tipo = ss.get("radio-tipo-nova")
+    data_viagem = ss.get("nv_data")
     erros = _validar(saida, destino, tipo, motivo)
+    if not data_viagem:
+        erros.insert(0, "Informe a data da viagem.")
     if erros:
         ss.nv_erros = erros
         return
     try:
-        db.criar_viagem(saida, destino, tipo, motivo)
+        db.criar_viagem(saida, destino, tipo, motivo, data_viagem)
     except db.ErroBanco as erro:
         ss.nv_erros = [str(erro)]
         return
@@ -75,7 +79,8 @@ def _registrar() -> None:
 def _formulario() -> None:
     with st.container(key="secao-nova-viagem"):
         ui.titulo_secao("Registrar nova viagem", "O valor é definido pelo tipo de viagem.")
-        c1, c2 = st.columns(2)
+        c0, c1, c2 = st.columns([1, 1.5, 1.5])
+        c0.date_input("Data da viagem", key="nv_data", format="DD/MM/YYYY", min_value=DATA_MIN, max_value=DATA_MAX)
         c1.text_input("Local de saída", key="nv_saida", max_chars=MAX_LOCAL)
         c2.text_input(
             "Local de destino",
@@ -101,14 +106,7 @@ def _formulario() -> None:
         if st.session_state.get("nv_erros"):
             st.error("\n\n".join(st.session_state.nv_erros))
 
-        c_chip, c_limpar, c_registrar = st.columns([3, 1, 1.35], vertical_alignment="center")
-        with c_chip:
-            ui.html_(
-                ui.chip_data(
-                    "Data e hora gravadas automaticamente ao registrar "
-                    f"(agora: {data_hora_br(agora(), ' às ')})"
-                )
-            )
+        _, c_limpar, c_registrar = st.columns([3, 1, 1.35], vertical_alignment="center")
         c_limpar.button("Limpar", key="btn-limpar-viagem", on_click=_limpar_formulario, width="stretch")
         c_registrar.button(
             "Registrar viagem",
@@ -131,18 +129,15 @@ def dialogo_viagem(viagem: dict, nonce: str, confirmar_exclusao: bool = False) -
 
     ui.subtitulo_dialogo("Altere os dados da viagem.")
 
-    original = viagem["criado_em"]
-    c_data, c_hora = st.columns(2)
+    data_original = viagem["criado_em"].date()
+    c_data, _ = st.columns(2)
     data_viagem = c_data.date_input(
         "Data da viagem",
-        value=original.date(),
+        value=data_original,
         key=prefixo + "data",
         format="DD/MM/YYYY",
         min_value=DATA_MIN,
         max_value=DATA_MAX,
-    )
-    hora_viagem = c_hora.time_input(
-        "Hora", value=original.time().replace(second=0, microsecond=0), key=prefixo + "hora", step=60
     )
 
     c1, c2 = st.columns(2)
@@ -204,16 +199,15 @@ def dialogo_viagem(viagem: dict, nonce: str, confirmar_exclusao: bool = False) -
         if c_salvar.button("Salvar alterações", key=prefixo + "salvar", type="primary", width="stretch"):
             saida, destino, motivo = saida.strip(), destino.strip(), motivo.strip()
             erros = _validar(saida, destino, tipo, motivo)
-            if not data_viagem or hora_viagem is None:
-                erros.append("Informe a data e a hora da viagem.")
+            if not data_viagem:
+                erros.insert(0, "Informe a data da viagem.")
             if erros:
                 st.error("\n\n".join(erros))
                 return
-            # Só grava nova data/hora se o usuário mudou algo (preserva os segundos originais)
-            nova = datetime.combine(data_viagem, hora_viagem, FUSO)
-            mudou = nova != original.replace(second=0, microsecond=0)
+            # Só grava a data se o usuário a alterou
+            nova_data = data_viagem if data_viagem != data_original else None
             try:
-                db.atualizar_viagem(viagem["id"], saida, destino, tipo, motivo, nova if mudou else None)
+                db.atualizar_viagem(viagem["id"], saida, destino, tipo, motivo, nova_data)
             except db.ErroBanco as erro:
                 st.error(str(erro))
                 return
@@ -257,10 +251,7 @@ def _lista(viagens_periodo: list[dict], periodo_ok: bool):
                 with st.container(key=f"tr-viagem-{v['id']}"):
                     cols = st.columns(LARGURAS, vertical_alignment="center")
                     celulas = [
-                        ui.td(
-                            f"{data_br(v['criado_em'])}"
-                            f'<span class="cv-td-sub">{v["criado_em"]:%H:%M}</span>'
-                        ),
+                        ui.td(data_br(v["criado_em"])),
                         ui.td(ui.esc(v["saida"])),
                         ui.td(ui.esc(v["destino"])),
                         ui.td(ui.chip_tipo(v["tipo"])),

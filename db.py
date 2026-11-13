@@ -80,7 +80,8 @@ def _buscar_viagens(de_iso: str, ate_iso: str) -> list[dict]:
         .select("*")
         .gte("criado_em", de_iso)
         .lt("criado_em", ate_iso)
-        .order("criado_em", desc=True),
+        .order("criado_em", desc=True)
+        .order("id", desc=True),
         "carregar as viagens",
     )
     return resposta.data or []
@@ -90,9 +91,14 @@ def listar_viagens(inicio: date, fim: date) -> list[dict]:
     return [_viagem(linha) for linha in _buscar_viagens(*_limites_do_periodo(inicio, fim))]
 
 
-def criar_viagem(saida: str, destino: str, tipo: str, motivo: str) -> None:
-    # criado_em fica com o default now() do banco: a data/hora é gravada no momento do registro.
+def _inicio_do_dia(dia: date) -> str:
+    """A viagem guarda só a data: grava 00:00 do dia no fuso de São Paulo."""
+    return _utc_iso(datetime.combine(dia, time.min, FUSO))
+
+
+def criar_viagem(saida: str, destino: str, tipo: str, motivo: str, data_viagem: date) -> None:
     dados = {
+        "criado_em": _inicio_do_dia(data_viagem),
         "saida": saida,
         "destino": destino,
         "tipo": tipo,
@@ -104,7 +110,7 @@ def criar_viagem(saida: str, destino: str, tipo: str, motivo: str) -> None:
 
 
 def atualizar_viagem(
-    viagem_id: int, saida: str, destino: str, tipo: str, motivo: str, criado_em: datetime | None = None
+    viagem_id: int, saida: str, destino: str, tipo: str, motivo: str, data_viagem: date | None = None
 ) -> None:
     dados = {
         "saida": saida,
@@ -113,8 +119,8 @@ def atualizar_viagem(
         "valor": float(VALORES_TIPO[tipo]),
         "motivo": motivo,
     }
-    if criado_em is not None:  # correção da data/hora da viagem
-        dados["criado_em"] = _utc_iso(criado_em)
+    if data_viagem is not None:  # correção da data da viagem
+        dados["criado_em"] = _inicio_do_dia(data_viagem)
     _executar(lambda c: c.table("viagens").update(dados).eq("id", viagem_id), "salvar a viagem")
     _buscar_viagens.clear()
 
